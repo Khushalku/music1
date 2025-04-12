@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+
+    <div class="main">
+        <div class="mm">
+            <div class="dvd"><img src="img2.png" alt=""></div>
+            <div class="main2">
+                <button id="chooseFileBtn">Choose Music File</button>
+                <input type="file" id="audioFile" accept="audio/*">
+                <div id="fileNameDisplay">No file chosen</div>
+
+                <!-- Audio Element (Hidden) -->
+                <audio id="audioPlayer"></audio>
+
+                <div class="loading">
+                    <div class="cg circle c1"></div>
+                    <div class="cg circle c2"></div>
+                    <div class="cg circle c3"></div>
+                    <div class="cg circle c4"></div>
+                    <div class="cg circle c5"></div>
+                    <div class="cg circle c6"></div>
+                    <div class="cg circle c7"></div>
+                    <div class="cg circle c8"></div>
+                    <div class="cg circle c9"></div>
+                    <div class="cg circle c10"></div>
+                    <div class="cg circle c11"></div>
+                    <div class="cg circle c12"></div>
+                    <div class="cg circle c13"></div>
+                    <div class="cg circle c14"></div>
+                    <div class="cg circle c15"></div>
+                    <div class="cg circle c16 "></div>
+                </div>
+                <div class="song">
+                    <div class="element e1 play-pause-button" id="playPauseBtn" role="button" tabindex="0"
+                        aria-label="Play" title="Play/Pause">
+                        <div class="play-icon"></div>
+                        <div class="pause-icon"></div>
+                    </div>
+                    <div class="element e2" id="progressBarContainer"> <!-- Added ID for seeking -->
+                        <div class="e21" id="progressBarFill"></div> <!-- Added ID -->
+                        <div class="e22" id="progressBarHandle"></div> <!-- Added ID -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // --- DOM Element References ---
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const dvd = document.querySelector('.dvd');
+            const circles = document.querySelectorAll('.loading .circle');
+            const progressBarFill = document.getElementById('progressBarFill');
+            const progressBarHandle = document.getElementById('progressBarHandle');
+            const progressBarContainer = document.getElementById('progressBarContainer'); // For seeking
+            const chooseFileBtn = document.getElementById('chooseFileBtn');
+            const fileInput = document.getElementById('audioFile');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+            const audioPlayer = document.getElementById('audioPlayer');
+
+            const animatedElements = [dvd, ...circles]; // Visualizer animations only
+
+            // --- State Variables ---
+            let isPlaying = false;
+            let currentObjectURL = null; // To manage memory
+
+            // --- Functions ---
+            function setVisualizerAnimationState(state) { // 'running' or 'paused'
+                animatedElements.forEach(el => {
+                    if (el) el.style.animationPlayState = state;
+                });
+            }
+
+            function updateUIForPlaybackState(playing) {
+                isPlaying = playing;
+                const state = isPlaying ? 'running' : 'paused';
+                setVisualizerAnimationState(state);
+                playPauseBtn.classList.toggle('playing', isPlaying);
+                playPauseBtn.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+            }
+
+            function updateProgressBar() {
+                if (audioPlayer.duration) {
+                    const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                    progressBarFill.style.width = `${progressPercent}%`;
+                    // Calculate handle position: (progress percent of container width) - (half handle width)
+                    const handleOffset = progressBarHandle.offsetWidth / 2;
+                    progressBarHandle.style.left = `calc(${progressPercent}% - ${handleOffset}px)`;
+                } else {
+                    // Reset if duration is not available (e.g., before load)
+                    progressBarFill.style.width = '0%';
+                    progressBarHandle.style.left = `-${progressBarHandle.offsetWidth / 2}px`;
+                }
+            }
+
+            function resetPlayer() {
+                audioPlayer.pause(); // Stop current playback if any
+                updateUIForPlaybackState(false); // Set UI to paused state
+                audioPlayer.currentTime = 0; // Reset time
+                updateProgressBar(); // Reset progress bar visuals
+            }
+
+
+            // --- Event Listeners ---
+
+            // 1. Choose File Button -> Trigger Hidden Input
+            chooseFileBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // 2. File Input -> Handle Selected File
+            fileInput.addEventListener('change', (event) => {
+                const files = event.target.files;
+                if (files.length > 0) {
+                    const file = files[0];
+
+                    // Revoke previous Object URL if exists
+                    if (currentObjectURL) {
+                        URL.revokeObjectURL(currentObjectURL);
+                    }
+
+                    // Create new Object URL
+                    currentObjectURL = URL.createObjectURL(file);
+
+                    // Update audio source and reset
+                    audioPlayer.src = currentObjectURL;
+                    audioPlayer.load(); // Important: load the new source
+                    resetPlayer(); // Pause visuals, reset time/progress
+
+                    // Display filename
+                    fileNameDisplay.textContent = file.name;
+                    fileNameDisplay.title = file.name; // Tooltip for long names
+
+                    console.log(`Loaded file: ${file.name}`);
+                }
+            });
+
+            // 3. Play/Pause Button -> Control Audio & Visuals
+            playPauseBtn.addEventListener('click', () => {
+                // Don't do anything if no file is loaded
+                if (!audioPlayer.src || audioPlayer.src === window.location.href) { // Check if src is valid
+                    console.warn("No audio file loaded.");
+                    return;
+                }
+
+                if (isPlaying) {
+                    audioPlayer.pause();
+                    // UI update will happen via the 'pause' event listener on audioPlayer
+                } else {
+                    // Attempt to play
+                    const playPromise = audioPlayer.play();
+
+                    if (playPromise !== undefined) {
+                        playPromise.then(_ => {
+                            // Playback started successfully.
+                            // UI update will happen via the 'play' event listener on audioPlayer
+                            console.log("Playback started.");
+                        }).catch(error => {
+                            // Auto-play was prevented or other error
+                            console.error("Playback failed:", error);
+                            // Ensure UI reflects paused state if play failed
+                            updateUIForPlaybackState(false);
+                        });
+                    }
+                }
+            });
+
+            // 4. Audio Player Events -> Synchronize UI
+            audioPlayer.addEventListener('play', () => {
+                console.log("Audio event: play");
+                updateUIForPlaybackState(true); // Update UI when playback actually starts
+            });
+
+            audioPlayer.addEventListener('pause', () => {
+                console.log("Audio event: pause");
+                updateUIForPlaybackState(false); // Update UI when playback pauses or ends
+            });
+
+            audioPlayer.addEventListener('ended', () => {
+                console.log("Audio event: ended");
+                // No need to explicitly call pause, the 'pause' event fires automatically on end.
+                // Reset time visually if desired, though 'pause' handles the state.
+                audioPlayer.currentTime = 0;
+                updateProgressBar();
+            });
+
+            audioPlayer.addEventListener('timeupdate', () => {
+                updateProgressBar(); // Update visual progress bar as audio plays
+            });
+
+            audioPlayer.addEventListener('loadedmetadata', () => {
+                console.log("Audio metadata loaded. Duration:", audioPlayer.duration);
+                updateProgressBar(); // Update bar in case currentTime was set before duration was known
+            });
+
+            audioPlayer.addEventListener('error', (e) => {
+                console.error("Audio playback error:", e);
+                fileNameDisplay.textContent = "Error loading audio";
+                resetPlayer();
+            });
+
+
+            // 5. Progress Bar Seeking
+            progressBarContainer.addEventListener('click', (e) => {
+                if (!audioPlayer.duration) return; // Can't seek if duration isn't known
+
+                const barWidth = progressBarContainer.clientWidth;
+                const clickPositionX = e.offsetX; // Get click position relative to the bar element
+                const seekRatio = clickPositionX / barWidth;
+                const seekTime = audioPlayer.duration * seekRatio;
+
+                audioPlayer.currentTime = seekTime;
+                updateProgressBar(); // Immediately update visual progress
+            });
+
+            // --- Initial Setup ---
+            // Ensure animations and progress bar start correctly paused/reset
+            setVisualizerAnimationState('paused');
+            updateProgressBar();
+
+        </script>
+
+
+</body>
+
+</html>
